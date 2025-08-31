@@ -1,9 +1,9 @@
-from parser.mark_down.mark_down import Markdown
+from parser.markdown_parser.markdown_parser import MarkdownBase
 
 
 def main():
-    filename=r""
-    markdown_parser = Markdown(128)
+    filename=r"D:\PycharmProjects\MinerU\demo\output\demo1\auto\demo1.md"
+    markdown_parser = MarkdownBase(128)
     sections, tables = markdown_parser(filename, None, separate_tables=False)
 
     # Process images for each section

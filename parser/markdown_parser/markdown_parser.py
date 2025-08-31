@@ -1,14 +1,14 @@
 from io import BytesIO
-from parser.mark_down import find_codec
-from parser.mark_down.markdown_parser import (MarkdownElementExtractor,
-                                              RAGFlowMarkdownParser)
+from parser.markdown_parser import find_codec
+from parser.markdown_parser.markdown_base import (MarkdownElementExtractor,
+                                                  RAGFlowMarkdownParser)
 
 from loguru import logger
 from markdown import markdown
 from PIL import Image
 
 
-class Markdown(RAGFlowMarkdownParser):
+class MarkdownBase(RAGFlowMarkdownParser):
     def get_picture_urls(self, sections):
         if not sections:
             return []
@@ -60,7 +60,7 @@ class Markdown(RAGFlowMarkdownParser):
             encoding = find_codec(binary)
             txt = binary.decode(encoding, errors="ignore")
         else:
-            with open(filename, "r") as f:
+            with open(filename, "r", encoding="utf-8") as f:
                 txt = f.read()
 
         remainder, tables = self.extract_tables_and_remainder(f'{txt}\n', separate_tables=separate_tables)

@@ -18,7 +18,7 @@
 import re
 
 import mistune
-from mark_down import markdown
+from markdown import markdown
 
 
 class RAGFlowMarkdownParser:
