@@ -1,0 +1,15 @@
+[project]
+name = "ragflow-modules"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4==4.13.5",
+    "chardet==5.2.0",
+    "loguru==0.7.3",
+    "markdown==3.8.2",
+    "mistune==3.1.4",
+    "pillow==11.3.0",
+    "requests==2.32.5",
+]

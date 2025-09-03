@@ -3,6 +3,7 @@ from parser.markdown_parser.markdown_parser import MarkdownBase
 
 def main():
     filename = r"D:\PycharmProjects\ragflow-modules\files\markdown\demo1.md"
+    filename = r"/Users/cj/PycharmProjects/ragflow-modules/files/myself/demo1.md"
     markdown_parser = MarkdownBase(128)
     sections, tables = markdown_parser(filename, None, separate_tables=False)
 
