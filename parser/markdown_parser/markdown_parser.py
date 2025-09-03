@@ -37,7 +37,8 @@ class MarkdownBase(RAGFlowMarkdownParser):
                 if url.startswith(('http://', 'https://')):
                     # For remote URLs, download the image
                     response = requests.get(url, stream=True, timeout=30)
-                    if response.status_code == 200 and response.headers['Content-Type'].startswith('image/'):
+                    # if response.status_code == 200 and response.headers['Content-Type'].startswith('image/'):
+                    if response.status_code == 200:
                         img = Image.open(BytesIO(response.content)).convert('RGB')
                         images.append(img)
                 else:
