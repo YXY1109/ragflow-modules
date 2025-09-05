@@ -1,3 +1,6 @@
+import copy
+import re
+
 import chardet
 from PIL import Image
 
@@ -70,3 +73,55 @@ def concat_img(img1, img2):
     new_image.paste(img1, (0, 0))
     new_image.paste(img2, (0, height1))
     return new_image
+
+
+def tokenize(d, t, eng):
+    d["content_with_weight"] = t
+    t = re.sub(r"</?(table|td|caption|tr|th)( [^<>]{0,12})?>", " ", t)
+    d["content_ltks"] = rag_tokenizer.tokenize(t)
+    d["content_sm_ltks"] = rag_tokenizer.fine_grained_tokenize(d["content_ltks"])
+
+
+def add_positions(d, poss):
+    if not poss:
+        return
+    page_num_int = []
+    position_int = []
+    top_int = []
+    for pn, left, right, top, bottom in poss:
+        page_num_int.append(int(pn + 1))
+        top_int.append(int(top))
+        position_int.append((int(pn + 1), int(left), int(right), int(top), int(bottom)))
+    d["page_num_int"] = page_num_int
+    d["position_int"] = position_int
+    d["top_int"] = top_int
+
+
+def tokenize_table(tbls, doc, eng, batch_size=10):
+    res = []
+    # add tables
+    for (img, rows), poss in tbls:
+        if not rows:
+            continue
+        if isinstance(rows, str):
+            d = copy.deepcopy(doc)
+            tokenize(d, rows, eng)
+            d["content_with_weight"] = rows
+            if img:
+                d["image"] = img
+                d["doc_type_kwd"] = "image"
+            if poss:
+                add_positions(d, poss)
+            res.append(d)
+            continue
+        de = "; " if eng else "； "
+        for i in range(0, len(rows), batch_size):
+            d = copy.deepcopy(doc)
+            r = de.join(rows[i:i + batch_size])
+            tokenize(d, r, eng)
+            if img:
+                d["image"] = img
+                d["doc_type_kwd"] = "image"
+            add_positions(d, poss)
+            res.append(d)
+    return res

@@ -1,5 +1,6 @@
+import re
 from functools import reduce
-from parser.markdown_parser import concat_img
+from parser.markdown_parser import concat_img, tokenize_table
 from parser.markdown_parser.markdown_parser import MarkdownBase
 
 
@@ -11,6 +12,14 @@ def main():
     filename = r"/Users/cj/PycharmProjects/ragflow-modules/files/myself/demo1.md"
     markdown_parser = MarkdownBase(128)
     sections, tables = markdown_parser(filename, None, separate_tables=False)
+
+    # 一些初始化
+    is_english = True  # is_english(cks)
+    doc = {
+        "docnm_kwd": filename,
+        "title_tks": rag_tokenizer.tokenize(re.sub(r"\.[a-zA-Z]+$", "", filename))
+    }
+    doc["title_sm_tks"] = rag_tokenizer.fine_grained_tokenize(doc["title_tks"])
 
     # Process images for each section
     section_images = []
@@ -26,6 +35,7 @@ def main():
             section_images.append(None)
 
     res = tokenize_table(tables, doc, is_english)
+    print(f"res:{res}")
     print("Finish parsing.")
 
 
