@@ -7,9 +7,13 @@ requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4==4.13.5",
     "chardet==5.2.0",
+    "datrie==0.8.2",
+    "hanziconv==0.3.2",
     "loguru==0.7.3",
     "markdown==3.8.2",
     "mistune==3.1.4",
+    "nltk==3.9.1",
     "pillow==11.3.0",
     "requests==2.32.5",
+    "tiktoken==0.7.0",
 ]

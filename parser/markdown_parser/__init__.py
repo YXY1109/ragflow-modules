@@ -4,6 +4,8 @@ import re
 import chardet
 from PIL import Image
 
+from nlp import rag_tokenizer
+
 all_codecs = [
     'utf-8', 'gb2312', 'gbk', 'utf_16', 'ascii', 'big5', 'big5hkscs',
     'cp037', 'cp273', 'cp424', 'cp437',
