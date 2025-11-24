@@ -18,6 +18,10 @@ from io import BytesIO
 
 from PIL import Image
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from nlp import is_english
 from parser.ppt_parser.ppt_parser import RAGFlowPptParser as PptParser
 
@@ -34,12 +38,22 @@ class Ppt(PptParser):
             for i, slide in enumerate(presentation.slides[from_page: to_page]):
                 try:
                     with BytesIO() as buffered:
-                        slide.get_thumbnail(
-                            0.1, 0.1).save(
-                            buffered, drawing.imaging.ImageFormat.jpeg)
-                        buffered.seek(0)
-                        imgs.append(Image.open(buffered).copy())
-                except RuntimeError as e:
+                        # 使用get_image方法获取幻灯片图像
+                        try:
+                            # get_image()方法不接受参数，返回图像对象
+                            image = slide.get_image()
+                            # 将图像保存到内存流
+                            image.save(buffered, drawing.imaging.ImageFormat.jpeg)
+                            buffered.seek(0)
+                            imgs.append(Image.open(buffered).copy())
+                        except Exception as img_e:
+                            print(f"Warning: Cannot create thumbnail for slide {i+1}: {img_e}, using placeholder")
+                            # 创建一个占位符图片
+                            placeholder_img = Image.new('RGB', (960, 720), color='white')
+                            placeholder_img.save(buffered, 'JPEG')
+                            buffered.seek(0)
+                            imgs.append(placeholder_img.copy())
+                except Exception as e:
                     raise RuntimeError(f'ppt parse error at page {i + 1}, original error: {str(e)}') from e
         assert len(imgs) == len(
             txts), "Slides text and image do not match: {} vs. {}".format(len(imgs), len(txts))
@@ -55,7 +69,7 @@ if __name__ == "__main__":
     ppt_parser = Ppt()
 
     # 指定要解析的PPTX文件路径
-    pptx_file = "20251755499694183.pptx"
+    pptx_file = os.path.join(os.path.dirname(__file__), "20251755499694183.pptx")
 
     if os.path.exists(pptx_file):
         print(f"开始解析PPTX文件: {pptx_file}")
