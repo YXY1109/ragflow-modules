@@ -41,7 +41,7 @@ class Ppt(PptParser):
                 for i, slide in enumerate(presentation.slides[from_page: to_page]):
                     try:
                         # 获取幻灯片图像
-                        slide_image = slide.get_image(0.1, 0.1)  # 使用全尺寸
+                        slide_image = slide.get_image(0.2, 0.2)  # 使用全尺寸
 
                         # 创建临时文件
                         temp_path = f"temp_slide_{i}.png"
