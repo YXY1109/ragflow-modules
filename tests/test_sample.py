@@ -25,4 +25,4 @@ def inc(x):
 
 
 def test_answer():
-    assert inc(3) == 4  # 故意写错，用于演示失败场景
+    assert inc(3) == 4  # 修复测试错误
