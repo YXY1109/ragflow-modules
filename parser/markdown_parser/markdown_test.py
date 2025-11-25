@@ -8,7 +8,7 @@ def main_chunk():
     """
     filename = r"/Users/cj/PycharmProjects/ragflow-modules/files/myself/demo1.md"
     filename = r"D:\PycharmProjects\ragflow-modules\files\markdown\myself\demo1.md"
-    filename = r"D:\PycharmProjects\ragflow-modules\files\markdown\myself\格力2023年年报.md"
+    # filename = r"D:\PycharmProjects\ragflow-modules\files\markdown\myself\格力2023年年报.md"
     markdown_parser = Markdown(128)
     sections, tables = markdown_parser(filename, separate_tables=False,
                                        delimiter="\n!?;。；！？")

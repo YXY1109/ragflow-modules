@@ -1,11 +1,13 @@
 import logging
+import re
+from functools import reduce
 from io import BytesIO
 
 from PIL import Image
 from markdown import markdown
 
 from markdown_parser import RAGFlowMarkdownParser as MarkdownParser, MarkdownElementExtractor
-from parser.markdown_parser import find_codec
+from parser.markdown_parser import find_codec, concat_img
 
 
 class Markdown(MarkdownParser):
@@ -24,65 +26,121 @@ class Markdown(MarkdownParser):
         soup = BeautifulSoup(html_content, 'html.parser')
         return soup
 
-    def get_picture_urls(self, soup):
-        if soup:
-            return [img.get('src') for img in soup.find_all('img') if img.get('src')]
-        return []
-
     def get_hyperlink_urls(self, soup):
         if soup:
             return set([a.get('href') for a in soup.find_all('a') if a.get('href')])
         return []
 
-    def get_pictures(self, text):
-        """Download and open all images from markdown text."""
+    def extract_image_urls_with_lines(self, text):
+        md_img_re = re.compile(r"!\[[^\]]*\]\(([^)\s]+)")
+        html_img_re = re.compile(r'src=["\\\']([^"\\\'>\\s]+)', re.IGNORECASE)
+        urls = []
+        seen = set()
+        lines = text.splitlines()
+        for idx, line in enumerate(lines):
+            for url in md_img_re.findall(line):
+                if (url, idx) not in seen:
+                    urls.append({"url": url, "line": idx})
+                    seen.add((url, idx))
+            for url in html_img_re.findall(line):
+                if (url, idx) not in seen:
+                    urls.append({"url": url, "line": idx})
+                    seen.add((url, idx))
+
+        # cross-line
+        try:
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(text, 'html.parser')
+            newline_offsets = [m.start() for m in re.finditer(r"\n", text)] + [len(text)]
+            for img_tag in soup.find_all('img'):
+                src = img_tag.get('src')
+                if not src:
+                    continue
+
+                tag_str = str(img_tag)
+                pos = text.find(tag_str)
+                if pos == -1:
+                    # fallback
+                    pos = max(text.find(src), 0)
+                line_no = 0
+                for i, off in enumerate(newline_offsets):
+                    if pos <= off:
+                        line_no = i
+                        break
+                if (src, line_no) not in seen:
+                    urls.append({"url": src, "line": line_no})
+                    seen.add((src, line_no))
+        except Exception:
+            pass
+
+        return urls
+
+    def load_images_from_urls(self, urls, cache=None):
         import requests
-        soup = self.md_to_html(text)
-        image_urls = self.get_picture_urls(soup)
+        from pathlib import Path
+
+        cache = cache or {}
         images = []
-        # Find all image URLs in text
-        for url in image_urls:
-            if not url:
+        for url in urls:
+            if url in cache:
+                if cache[url]:
+                    images.append(cache[url])
                 continue
+            img_obj = None
             try:
-                # check if the url is a local file or a remote URL
                 if url.startswith(('http://', 'https://')):
-                    # For remote URLs, download the image
                     response = requests.get(url, stream=True, timeout=30)
-                    if response.status_code == 200 and response.headers['Content-Type'] and response.headers[
-                        'Content-Type'].startswith('image/'):
-                        img = Image.open(BytesIO(response.content)).convert('RGB')
-                        images.append(img)
+                    if response.status_code == 200 and response.headers.get('Content-Type', '').startswith('image/'):
+                        img_obj = Image.open(BytesIO(response.content)).convert('RGB')
                 else:
-                    # For local file paths, open the image directly
-                    from pathlib import Path
                     local_path = Path(url)
-                    if not local_path.exists():
+                    if local_path.exists():
+                        img_obj = Image.open(url).convert('RGB')
+                    else:
                         logging.warning(f"Local image file not found: {url}")
-                        continue
-                    img = Image.open(url).convert('RGB')
-                    images.append(img)
             except Exception as e:
                 logging.error(f"Failed to download/open image from {url}: {e}")
-                continue
+            cache[url] = img_obj
+            if img_obj:
+                images.append(img_obj)
+        return images, cache
 
-        return images if images else None
-
-    def __call__(self, filename, binary=None, separate_tables=True, delimiter=None):
+    def __call__(self, filename, binary=None, separate_tables=True, delimiter=None, return_section_images=False):
         if binary:
             encoding = find_codec(binary)
             txt = binary.decode(encoding, errors="ignore")
         else:
-            with open(filename, "r",encoding="utf-8") as f:
+            with open(filename, "r", encoding="utf-8") as f:
                 txt = f.read()
 
         remainder, tables = self.extract_tables_and_remainder(f'{txt}\n', separate_tables=separate_tables)
         # To eliminate duplicate tables in chunking result, uncomment code below and set separate_tables to True in line 410.
         # extractor = MarkdownElementExtractor(remainder)
         extractor = MarkdownElementExtractor(txt)
-        element_sections = extractor.extract_elements(delimiter)
-        sections = [(element, "") for element in element_sections]
+        image_refs = self.extract_image_urls_with_lines(txt)
+        element_sections = extractor.extract_elements(delimiter, include_meta=True)
+
+        sections = []
+        section_images = []
+        image_cache = {}
+        for element in element_sections:
+            content = element["content"]
+            start_line = element["start_line"]
+            end_line = element["end_line"]
+            urls_in_section = [ref["url"] for ref in image_refs if start_line <= ref["line"] <= end_line]
+            imgs = []
+            if urls_in_section:
+                imgs, image_cache = self.load_images_from_urls(urls_in_section, image_cache)
+            combined_image = None
+            if imgs:
+                combined_image = reduce(concat_img, imgs) if len(imgs) > 1 else imgs[0]
+            sections.append((content, ""))
+            section_images.append(combined_image)
+
         tbls = []
         for table in tables:
             tbls.append(((None, markdown(table, extensions=['markdown.extensions.tables'])), ""))
+        if return_section_images:
+            return sections, tbls, section_images
         return sections, tbls

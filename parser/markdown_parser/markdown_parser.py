@@ -36,11 +36,11 @@ class RAGFlowMarkdownParser:
                 table_list.append(raw_table)
                 if separate_tables:
                     # Skip this match (i.e., remove it)
-                    new_text += working_text[last_end: match.start()] + "\n\n"
+                    new_text += working_text[last_end : match.start()] + "\n\n"
                 else:
                     # Replace with rendered HTML
                     html_table = markdown(raw_table, extensions=["markdown.extensions.tables"]) if render else raw_table
-                    new_text += working_text[last_end: match.start()] + html_table + "\n\n"
+                    new_text += working_text[last_end : match.start()] + html_table + "\n\n"
                 last_end = match.end()
             new_text += working_text[last_end:]
             return new_text
@@ -72,9 +72,7 @@ class RAGFlowMarkdownParser:
 
         # Replace any TAGS e.g. <table ...> to <table>
         TAGS = ["table", "td", "tr", "th", "tbody", "thead", "div"]
-        table_with_attributes_pattern = re.compile(
-            rf"<(?:{'|'.join(TAGS)})[^>]*>", re.IGNORECASE
-        )
+        table_with_attributes_pattern = re.compile(rf"<(?:{'|'.join(TAGS)})[^>]*>", re.IGNORECASE)
 
         def replace_tag(m):
             tag_name = re.match(r"<(\w+)", m.group()).group(1)
@@ -112,9 +110,9 @@ class RAGFlowMarkdownParser:
                     raw_table = match.group()
                     tables.append(raw_table)
                     if separate_tables:
-                        new_text += working_text[last_end: match.start()] + "\n\n"
+                        new_text += working_text[last_end : match.start()] + "\n\n"
                     else:
-                        new_text += working_text[last_end: match.start()] + raw_table + "\n\n"
+                        new_text += working_text[last_end : match.start()] + raw_table + "\n\n"
                     last_end = match.end()
                 new_text += working_text[last_end:]
                 working_text = new_text
@@ -134,7 +132,7 @@ class MarkdownElementExtractor:
         toks = sorted(set(toks), key=lambda x: -len(x))
         return "|".join(re.escape(t) for t in toks if t)
 
-    def extract_elements(self, delimiter=None):
+    def extract_elements(self, delimiter=None, include_meta=False):
         """Extract individual elements (headers, code blocks, lists, etc.)"""
         sections = []
 
@@ -144,8 +142,33 @@ class MarkdownElementExtractor:
             dels = self.get_delimiters(delimiter)
         if len(dels) > 0:
             text = "\n".join(self.lines)
-            parts = re.split(dels, text)
-            sections = [p.strip() for p in parts if p and p.strip()]
+            if include_meta:
+                pattern = re.compile(dels)
+                last_end = 0
+                for m in pattern.finditer(text):
+                    part = text[last_end : m.start()]
+                    if part and part.strip():
+                        sections.append(
+                            {
+                                "content": part.strip(),
+                                "start_line": text.count("\n", 0, last_end),
+                                "end_line": text.count("\n", 0, m.start()),
+                            }
+                        )
+                    last_end = m.end()
+
+                part = text[last_end:]
+                if part and part.strip():
+                    sections.append(
+                        {
+                            "content": part.strip(),
+                            "start_line": text.count("\n", 0, last_end),
+                            "end_line": text.count("\n", 0, len(text)),
+                        }
+                    )
+            else:
+                parts = re.split(dels, text)
+                sections = [p.strip() for p in parts if p and p.strip()]
             return sections
         while i < len(self.lines):
             line = self.lines[i]
@@ -153,32 +176,35 @@ class MarkdownElementExtractor:
             if re.match(r"^#{1,6}\s+.*$", line):
                 # header
                 element = self._extract_header(i)
-                sections.append(element["content"])
+                sections.append(element if include_meta else element["content"])
                 i = element["end_line"] + 1
             elif line.strip().startswith("```"):
                 # code block
                 element = self._extract_code_block(i)
-                sections.append(element["content"])
+                sections.append(element if include_meta else element["content"])
                 i = element["end_line"] + 1
             elif re.match(r"^\s*[-*+]\s+.*$", line) or re.match(r"^\s*\d+\.\s+.*$", line):
                 # list block
                 element = self._extract_list_block(i)
-                sections.append(element["content"])
+                sections.append(element if include_meta else element["content"])
                 i = element["end_line"] + 1
             elif line.strip().startswith(">"):
                 # blockquote
                 element = self._extract_blockquote(i)
-                sections.append(element["content"])
+                sections.append(element if include_meta else element["content"])
                 i = element["end_line"] + 1
             elif line.strip():
                 # text block (paragraphs and inline elements until next block element)
                 element = self._extract_text_block(i)
-                sections.append(element["content"])
+                sections.append(element if include_meta else element["content"])
                 i = element["end_line"] + 1
             else:
                 i += 1
 
-        sections = [section for section in sections if section.strip()]
+        if include_meta:
+            sections = [section for section in sections if section["content"].strip()]
+        else:
+            sections = [section for section in sections if section.strip()]
         return sections
 
     def _extract_header(self, start_pos):
@@ -216,12 +242,12 @@ class MarkdownElementExtractor:
             line = self.lines[i]
             # check if this line is a list item or continuation of a list
             if (
-                    re.match(r"^\s*[-*+]\s+.*$", line)
-                    or re.match(r"^\s*\d+\.\s+.*$", line)
-                    or (i > start_pos and not line.strip())
-                    or (i > start_pos and re.match(r"^\s{2,}[-*+]\s+.*$", line))
-                    or (i > start_pos and re.match(r"^\s{2,}\d+\.\s+.*$", line))
-                    or (i > start_pos and re.match(r"^\s+\w+.*$", line))
+                re.match(r"^\s*[-*+]\s+.*$", line)
+                or re.match(r"^\s*\d+\.\s+.*$", line)
+                or (i > start_pos and not line.strip())
+                or (i > start_pos and re.match(r"^\s{2,}[-*+]\s+.*$", line))
+                or (i > start_pos and re.match(r"^\s{2,}\d+\.\s+.*$", line))
+                or (i > start_pos and re.match(r"^\s+\w+.*$", line))
             ):
                 content_lines.append(line)
                 end_pos = i
@@ -266,18 +292,16 @@ class MarkdownElementExtractor:
         while i < len(self.lines):
             line = self.lines[i]
             # stop if we encounter a block element
-            if re.match(r"^#{1,6}\s+.*$", line) or line.strip().startswith("```") or re.match(r"^\s*[-*+]\s+.*$",
-                                                                                              line) or re.match(
-                    r"^\s*\d+\.\s+.*$", line) or line.strip().startswith(">"):
+            if re.match(r"^#{1,6}\s+.*$", line) or line.strip().startswith("```") or re.match(r"^\s*[-*+]\s+.*$", line) or re.match(r"^\s*\d+\.\s+.*$", line) or line.strip().startswith(">"):
                 break
             elif not line.strip():
                 # check if the next line is a block element
                 if i + 1 < len(self.lines) and (
-                        re.match(r"^#{1,6}\s+.*$", self.lines[i + 1])
-                        or self.lines[i + 1].strip().startswith("```")
-                        or re.match(r"^\s*[-*+]\s+.*$", self.lines[i + 1])
-                        or re.match(r"^\s*\d+\.\s+.*$", self.lines[i + 1])
-                        or self.lines[i + 1].strip().startswith(">")
+                    re.match(r"^#{1,6}\s+.*$", self.lines[i + 1])
+                    or self.lines[i + 1].strip().startswith("```")
+                    or re.match(r"^\s*[-*+]\s+.*$", self.lines[i + 1])
+                    or re.match(r"^\s*\d+\.\s+.*$", self.lines[i + 1])
+                    or self.lines[i + 1].strip().startswith(">")
                 ):
                     break
                 else:
