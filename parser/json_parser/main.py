@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
 import json
-import sys
-import os
-
-
 
 from parser.json_parser.json_parser import RAGFlowJsonParser
 
@@ -29,7 +25,7 @@ def test_json_parser():
     chunks = json_parser.split_text(json_data=simple_json, convert_lists=True)
 
     for i, chunk in enumerate(chunks):
-        print(f"  块 {i+1}: {chunk}")
+        print(f"  块 {i + 1}: {chunk}")
     print()
 
     # 测试 2: 复杂嵌套对象
@@ -63,7 +59,7 @@ def test_json_parser():
 
     chunks = json_parser.split_text(json_data=complex_json, convert_lists=True)
     for i, chunk in enumerate(chunks):
-        print(f"  块 {i+1}: {chunk}")
+        print(f"  块 {i + 1}: {chunk}")
     print()
 
     # 测试 3: 使用二进制输入
@@ -84,7 +80,7 @@ def test_json_parser():
     # 使用 __call__ 方法解析
     result_chunks = json_parser(json_bytes)
     for i, chunk in enumerate(result_chunks):
-        print(f"  块 {i+1}: {chunk}")
+        print(f"  块 {i + 1}: {chunk}")
     print()
 
     # 测试 4: JSONL 格式测试
@@ -96,7 +92,7 @@ def test_json_parser():
     jsonl_bytes = jsonl_content.encode('utf-8')
     jsonl_chunks = json_parser(jsonl_bytes)
     for i, chunk in enumerate(jsonl_chunks):
-        print(f"  块 {i+1}: {chunk}")
+        print(f"  块 {i + 1}: {chunk}")
     print()
 
     # 测试 5: 大数据分块测试
@@ -107,10 +103,10 @@ def test_json_parser():
             "id": i,
             "name": f"项目{i}",
             "description": f"这是第{i}个项目的详细描述，包含足够的内容来测试分块功能",
-            "tags": [f"标签{i}", f"类别{i%5}", f"类型{i%3}"],
+            "tags": [f"标签{i}", f"类别{i % 5}", f"类型{i % 3}"],
             "metadata": {
-                "created": f"2025-01-{(i%28)+1:02d}",
-                "updated": f"2025-01-{(i%28)+1:02d}",
+                "created": f"2025-01-{(i % 28) + 1:02d}",
+                "updated": f"2025-01-{(i % 28) + 1:02d}",
                 "priority": i % 4
             }
         }
@@ -118,7 +114,7 @@ def test_json_parser():
     large_chunks = json_parser.split_text(json_data=large_data, convert_lists=True)
     print(f"  总共分割成 {len(large_chunks)} 个块")
     for i, chunk in enumerate(large_chunks[:3]):  # 只显示前3个块
-        print(f"  块 {i+1} (长度: {len(chunk)}): {chunk[:100]}...")
+        print(f"  块 {i + 1} (长度: {len(chunk)}): {chunk[:100]}...")
     print(f"  最后一个块 (长度: {len(large_chunks[-1])}): {large_chunks[-1][:100]}...")
     print()
 
@@ -188,10 +184,13 @@ def demo_json_file_processing():
 
 
 if __name__ == '__main__':
+    """
+    直接使用的
+    """
     # 运行基本测试
     test_json_parser()
 
-    print("\n" + "="*50 + "\n")
+    print("\n" + "=" * 50 + "\n")
 
     # 运行文件处理演示
     demo_json_file_processing()
