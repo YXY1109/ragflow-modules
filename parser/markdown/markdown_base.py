@@ -7,7 +7,8 @@ from PIL import Image
 from markdown import markdown
 
 from markdown_parser import RAGFlowMarkdownParser as MarkdownParser, MarkdownElementExtractor
-from parser.markdown_parser import find_codec, concat_img
+from nlp.merge import concat_img
+from parser.markdown import find_codec
 
 
 class Markdown(MarkdownParser):

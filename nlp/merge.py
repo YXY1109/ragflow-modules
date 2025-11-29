@@ -218,3 +218,85 @@ def tokenize_chunks(chunks, doc, eng, pdf_parser=None):
         tokenize(d, ck, eng)
         res.append(d)
     return res
+
+
+class Node:
+    def __init__(self, level, depth=-1, texts=None):
+        self.level = level
+        self.depth = depth
+        self.texts = texts or []
+        self.children = []
+
+    def add_child(self, child_node):
+        self.children.append(child_node)
+
+    def get_children(self):
+        return self.children
+
+    def get_level(self):
+        return self.level
+
+    def get_texts(self):
+        return self.texts
+
+    def set_texts(self, texts):
+        self.texts = texts
+
+    def add_text(self, text):
+        self.texts.append(text)
+
+    def clear_text(self):
+        self.texts = []
+
+    def __repr__(self):
+        return f"Node(level={self.level}, texts={self.texts}, children={len(self.children)})"
+
+    def build_tree(self, lines):
+        stack = [self]
+        for level, text in lines:
+            if self.depth != -1 and level > self.depth:
+                # Beyond target depth: merge content into the current leaf instead of creating deeper nodes
+                stack[-1].add_text(text)
+                continue
+
+            # Move up until we find the proper parent whose level is strictly smaller than current
+            while len(stack) > 1 and level <= stack[-1].get_level():
+                stack.pop()
+
+            node = Node(level=level, texts=[text])
+            # Attach as child of current parent and descend
+            stack[-1].add_child(node)
+            stack.append(node)
+
+        return self
+
+    def get_tree(self):
+        tree_list = []
+        self._dfs(self, tree_list, [])
+        return tree_list
+
+    def _dfs(self, node, tree_list, titles):
+        level = node.get_level()
+        texts = node.get_texts()
+        child = node.get_children()
+
+        if level == 0 and texts:
+            tree_list.append("\n".join(titles+texts))
+
+        # Titles within configured depth are accumulated into the current path
+        if 1 <= level <= self.depth:
+            path_titles = titles + texts
+        else:
+            path_titles = titles
+
+        # Body outside the depth limit becomes its own chunk under the current title path
+        if level > self.depth and texts:
+            tree_list.append("\n".join(path_titles + texts))
+
+        # A leaf title within depth emits its title path as a chunk (header-only section)
+        elif not child and (1 <= level <= self.depth):
+            tree_list.append("\n".join(path_titles))
+
+        # Recurse into children with the updated title path
+        for c in child:
+            self._dfs(c, tree_list, path_titles)
