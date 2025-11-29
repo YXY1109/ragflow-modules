@@ -7,6 +7,81 @@ from nlp import rag_tokenizer
 from nlp.tokens_num import num_tokens_from_string
 
 
+def not_bullet(line):
+    patt = [
+        r"0", r"[0-9]+ +[0-9~个只-]", r"[0-9]+\.{2,}"
+    ]
+    return any([re.match(r, line) for r in patt])
+
+
+def bullets_category(sections):
+    global BULLET_PATTERN
+    hits = [0] * len(BULLET_PATTERN)
+    for i, pro in enumerate(BULLET_PATTERN):
+        for sec in sections:
+            sec = sec.strip()
+            for p in pro:
+                if re.match(p, sec) and not not_bullet(sec):
+                    hits[i] += 1
+                    break
+    maximum = 0
+    res = -1
+    for i, h in enumerate(hits):
+        if h <= maximum:
+            continue
+        res = i
+        maximum = h
+    return res
+
+
+BULLET_PATTERN = [[
+    r"第[零一二三四五六七八九十百0-9]+(分?编|部分)",
+    r"第[零一二三四五六七八九十百0-9]+章",
+    r"第[零一二三四五六七八九十百0-9]+节",
+    r"第[零一二三四五六七八九十百0-9]+条",
+    r"[\(（][零一二三四五六七八九十百]+[\)）]",
+], [
+    r"第[0-9]+章",
+    r"第[0-9]+节",
+    r"[0-9]{,2}[\. 、]",
+    r"[0-9]{,2}\.[0-9]{,2}[^a-zA-Z/%~-]",
+    r"[0-9]{,2}\.[0-9]{,2}\.[0-9]{,2}",
+    r"[0-9]{,2}\.[0-9]{,2}\.[0-9]{,2}\.[0-9]{,2}",
+], [
+    r"第[零一二三四五六七八九十百0-9]+章",
+    r"第[零一二三四五六七八九十百0-9]+节",
+    r"[零一二三四五六七八九十百]+[ 、]",
+    r"[\(（][零一二三四五六七八九十百]+[\)）]",
+    r"[\(（][0-9]{,2}[\)）]",
+], [
+    r"PART (ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN)",
+    r"Chapter (I+V?|VI*|XI|IX|X)",
+    r"Section [0-9]+",
+    r"Article [0-9]+"
+], [
+    r"^#[^#]",
+    r"^##[^#]",
+    r"^###.*",
+    r"^####.*",
+    r"^#####.*",
+    r"^######.*",
+]
+]
+
+
+def docx_question_level(p, bull=-1):
+    txt = re.sub(r"\u3000", " ", p.text).strip()
+    if p.style.name.startswith('Heading'):
+        return int(p.style.name.split(' ')[-1]), txt
+    else:
+        if bull < 0:
+            return 0, txt
+        for j, title in enumerate(BULLET_PATTERN[bull]):
+            if re.match(title, txt):
+                return j + 1, txt
+    return len(BULLET_PATTERN[bull]) + 1, txt
+
+
 def concat_img(img1, img2):
     if img1 and not img2:
         return img1
@@ -198,6 +273,7 @@ def naive_merge(sections: str | list, chunk_token_num=128, delimiter="\n。；�
 
     return cks
 
+
 def tokenize_chunks(chunks, doc, eng, pdf_parser=None):
     res = []
     # wrap up as es documents
@@ -214,7 +290,7 @@ def tokenize_chunks(chunks, doc, eng, pdf_parser=None):
             except NotImplementedError:
                 pass
         else:
-            add_positions(d, [[ii]*5])
+            add_positions(d, [[ii] * 5])
         tokenize(d, ck, eng)
         res.append(d)
     return res
@@ -281,7 +357,7 @@ class Node:
         child = node.get_children()
 
         if level == 0 and texts:
-            tree_list.append("\n".join(titles+texts))
+            tree_list.append("\n".join(titles + texts))
 
         # Titles within configured depth are accumulated into the current path
         if 1 <= level <= self.depth:

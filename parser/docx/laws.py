@@ -3,7 +3,7 @@ from io import BytesIO
 
 from docx import Document
 
-from nlp.merge import Node
+from nlp.merge import Node, docx_question_level, bullets_category
 from parser.docx.docx_parser import RAGFlowDocxParser
 
 

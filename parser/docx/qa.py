@@ -3,7 +3,7 @@ from io import BytesIO
 from PIL import Image
 from docx import Document
 
-from nlp.merge import concat_img
+from nlp.merge import concat_img, docx_question_level
 from parser.docx.docx_parser import RAGFlowDocxParser
 
 
