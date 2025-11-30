@@ -53,9 +53,45 @@ uv run ruff check .
 uv run ruff format .
 ```
 
-## 代码架构
+## 高层架构
 
-### 核心模块结构
+### 解析器架构
+项目采用策略模式实现多格式文档解析：
+
+- **parser/docx/** - Word文档解析，包含5种不同的解析策略：
+  - `docx_parser.py` - 基础RAGFlow风格解析器
+  - `laws.py` - 法律文档专用解析器
+  - `manual.py` - 手册文档解析器，支持图文配对
+  - `naive.py` - 简单直接的解析器
+  - `qa.py` - 问答对解析器
+
+- **parser/txt/** - 纯文本解析器，支持native和email格式
+
+- **parser/markdown/** - Markdown解析器，支持表格提取和图片处理
+
+- **parser/excel/** - Excel解析器，支持QA表格提取
+
+- **parser/html/** - HTML解析器
+
+- **parser/json/** - JSON解析器
+
+- **parser/ppt/** - PowerPoint解析器
+
+### 动态注册系统
+实现了基于类继承的自动注册机制：
+
+- 所有解析器都实现统一的`__call__`接口
+- 支持多种文档格式和解析策略
+- 便于扩展新的解析器和处理方式
+
+### NLP处理流水线
+提供完整的中文NLP处理能力：
+
+1. **RAGTokenizer** - 基于HUQIE的中英文分词器
+2. **文本合并** - 支持多种合并策略的文本处理
+3. **Token计算** - 精确的token数量计算
+
+## 核心模块结构
 
 1. **dynamic_registry_demo/** - 动态注册系统
    - `base.py`: 定义基类 `BaseLLM` 和 `BaseTextProcessor`
@@ -117,6 +153,51 @@ uv run ruff format .
 
 ## 测试和验证
 
-- 每个模块都包含可执行的测试代码
-- 运行各个模块的 `__main__` 部分可以进行基本功能验证
-- `files/` 目录下包含各种格式的测试文档
+项目使用pytest作为测试框架，配置完整的测试套件：
+
+### 测试命令
+```bash
+# 运行所有测试
+uv run pytest tests/
+
+# 运行特定测试文件
+uv run pytest tests/test_rag_tokenizer_fixed.py
+
+# 运行带覆盖率的测试
+uv run pytest tests/ --cov=parser --cov=nlp --cov=dynamic_registry_demo
+
+# 生成HTML测试报告
+uv run pytest tests/ --html=reports/test_report.html --self-contained-html
+
+# 按标记运行测试
+uv run pytest tests/ -m unit          # 单元测试
+uv run pytest tests/ -m nlp           # NLP相关测试
+uv run pytest tests/ -m parser         # 解析器测试
+uv run pytest tests/ -m "not slow"     # 排除慢速测试
+```
+
+### 测试结构
+- `tests/conftest.py` - 共享fixture和配置
+- `tests/test_dynamic_registry.py` - 动态注册系统测试
+- `tests/test_markdown_parser_simple.py` - Markdown解析器测试
+- `tests/test_rag_tokenizer_fixed.py` - RAG分词器测试
+- `tests/test_txt_parser_simple.py` - 文本解析器测试
+- `tests/test_tokens_num.py` - Token计算测试
+- `tests/test_merge.py` - 文本合并测试
+
+### 模块独立测试
+每个解析器模块都有独立的main.py用于快速测试：
+```bash
+# 测试DOCX解析器（包含多种策略）
+python parser/docx/main.py
+
+# 测试其他解析器
+python parser/txt/main.py
+python parser/markdown/main.py
+python parser/excel/main.py
+```
+
+### 验证文件
+- `files/` 目录包含各种格式的测试文档
+- 支持中文、英文、混合语言文档测试
+- 包含表格、图片、复杂格式的测试用例
