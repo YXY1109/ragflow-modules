@@ -2,6 +2,7 @@
 # 公共工具函数 - 基于OpenRouter API
 # ========
 import json
+import os
 import re
 from typing import Dict, Any, Optional
 

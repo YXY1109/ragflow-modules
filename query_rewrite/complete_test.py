@@ -8,6 +8,10 @@ Query改写系统完整测试和示例
 import os
 import sys
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -22,7 +26,7 @@ def test_basic_query_examples():
 
     # 创建配置
     config = QueryRewriterConfig(
-        model="z-ai/glm-4.5-air:free",
+        model="glm-4.6",
         timeout_read=60.0,  # 增加读取超时
         timeout_connect=20.0
     )
@@ -117,7 +121,7 @@ def test_individual_rewriters():
     print("=" * 80)
 
     config = QueryRewriterConfig(
-        model="z-ai/glm-4.5-air:free",
+        model="glm-4.6",
         timeout_read=45.0
     )
 
@@ -157,8 +161,8 @@ def test_individual_rewriters():
     print("\n👉 指代改写器测试:")
     reference_rewriter = ReferenceQueryRewriter(config=config)
     reference_result = reference_rewriter.rewrite(
-        query="它有多高？",
-        context="用户刚才在询问创极速光轮过山车"
+        current_query="它有多高？",
+        conversation_history="用户刚才在询问创极速光轮过山车"
     )
     print(f"查询: 它有多高？")
     print(f"改写后: {reference_result}")
@@ -168,7 +172,7 @@ def test_individual_rewriters():
     comparison_rewriter = ComparisonQueryRewriter(config=config)
     comparison_result = comparison_rewriter.rewrite(
         query="这两个项目哪个更刺激？",
-        context="用户在比较创极速光轮和加勒比海盗"
+        context_info="用户在比较创极速光轮和加勒比海盗"
     )
     print(f"查询: 这两个项目哪个更刺激？")
     print(f"改写后: {comparison_result}")
@@ -177,8 +181,8 @@ def test_individual_rewriters():
     print("\n📚 上下文改写器测试:")
     context_rewriter = ContextDependentQueryRewriter(config=config)
     context_result = context_rewriter.rewrite(
-        query="还有其他项目吗？",
-        context="用户已经玩了创极速光轮，想了解其他项目"
+        current_query="还有其他项目吗？",
+        conversation_history="用户已经玩了创极速光轮，想了解其他项目"
     )
     print(f"查询: 还有其他项目吗？")
     print(f"改写后: {context_result}")
@@ -192,7 +196,7 @@ def test_configuration_options():
 
     # 测试不同模型
     models_to_test = [
-        "z-ai/glm-4.5-air:free",
+        "glm-4.6",
         # 可以添加其他免费模型进行测试
     ]
 
@@ -201,8 +205,7 @@ def test_configuration_options():
         try:
             config = QueryRewriterConfig(
                 model=model,
-                timeout_read=30.0,
-                temperature=0.3  # 较低温度，更稳定输出
+                timeout_read=30.0
             )
 
             rewriter = AutoQueryRewriter(config=config)
@@ -250,7 +253,7 @@ from query_rewrite import AutoQueryRewriter, QueryRewriterConfig
 
 # 自定义配置
 config = QueryRewriterConfig(
-    model="z-ai/glm-4.5-air:free",
+    model="glm-4.6",
     timeout_read=120.0,  # 增加超时时间
     temperature=0.3      # 降低随机性
 )
