@@ -1,7 +1,8 @@
 # ==========
 # 对比型Query改写器
 # =========
-from .utils import BaseQueryRewriter, get_completion
+from .utils import BaseQueryRewriter, get_completion, QueryRewriterConfig
+
 
 class ComparisonQueryRewriter(BaseQueryRewriter):
     """对比型Query改写器
@@ -11,6 +12,10 @@ class ComparisonQueryRewriter(BaseQueryRewriter):
     2. 明确对比对象（从Query或历史中提取）
     3. 细化对比维度（补充具体的评估标准）
     """
+
+    def __init__(self, model: str = None, config: QueryRewriterConfig = None):
+        self.model = model or (config.model if config else "z-ai/glm-4.5-air:free")
+        self.config = config or QueryRewriterConfig()
 
     def rewrite(self, query: str, context_info: str = "") -> str:
         """改写对比型Query

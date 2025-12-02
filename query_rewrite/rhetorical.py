@@ -1,8 +1,10 @@
 # ======
 # 反问型Query改写器
 # ======
-from .utils import BaseQueryRewriter, get_completion
+from .utils import BaseQueryRewriter, get_json_completion, QueryRewriterConfig
 import json
+from typing import Dict, Any
+
 
 class RhetoricalQueryRewriter(BaseQueryRewriter):
     """反问型Query改写器
@@ -19,7 +21,11 @@ class RhetoricalQueryRewriter(BaseQueryRewriter):
     • 降低投诉率（及时情绪安抚）
     """
 
-    def rewrite(self, query: str, context: str = "") -> dict:
+    def __init__(self, model: str = None, config: QueryRewriterConfig = None):
+        self.model = model or (config.model if config else "z-ai/glm-4.5-air:free")
+        self.config = config or QueryRewriterConfig()
+
+    def rewrite(self, query: str, context: str = "") -> Dict[str, Any]:
         """将反问句改写为客观疑问句，并标注情绪
 
         改写逻辑:
@@ -144,20 +150,69 @@ class RhetoricalQueryRewriter(BaseQueryRewriter):
 
 ### 分析结果（JSON格式）###
 """
-        response = get_completion(prompt, self.model)
-
-        # 解析JSON
+        # 使用JSON completion方法
         try:
-            result = json.loads(response)
-            return result
+            result = get_json_completion(
+                prompt,
+                model=self.model,
+                temperature=0.3,  # 使用较低温度确保一致性
+                config=self.config
+            )
+
+            # 确保返回的数据结构正确
+            if "error" in result:
+                # 如果API调用失败，返回默认结果
+                return self._get_default_result(query, "API调用失败")
+
+            # 验证并补全必要字段
+            return self._validate_and_normalize_result(result, query)
+
         except Exception as e:
-            # 如果解析失败，返回原始Query
-            return {
-                "is_rhetorical": False,
-                "emotion": "neutral",
-                "emotion_intensity": "none",
-                "rewritten_query": query,
-                "original_query": query,
-                "empathy_keywords": [],
-                "reasoning": f"解析失败: {str(e)}"
-            }
+            print(f"反问改写失败: {e}")
+            return self._get_default_result(query, str(e))
+
+    def _get_default_result(self, query: str, error_msg: str) -> Dict[str, Any]:
+        """获取默认结果（处理失败时使用）"""
+        return {
+            "is_rhetorical": False,
+            "emotion": "neutral",
+            "emotion_intensity": "none",
+            "rewritten_query": query,
+            "original_query": query,
+            "empathy_keywords": [],
+            "reasoning": f"解析失败或非反问句: {error_msg}"
+        }
+
+    def _validate_and_normalize_result(self, result: Dict[str, Any], original_query: str) -> Dict[str, Any]:
+        """验证并标准化返回结果"""
+        # 确保必要字段存在
+        if "is_rhetorical" not in result:
+            result["is_rhetorical"] = False
+        if "emotion" not in result:
+            result["emotion"] = "neutral"
+        if "emotion_intensity" not in result:
+            result["emotion_intensity"] = "none"
+        if "rewritten_query" not in result:
+            result["rewritten_query"] = original_query
+        if "original_query" not in result:
+            result["original_query"] = original_query
+        if "empathy_keywords" not in result:
+            result["empathy_keywords"] = []
+        if "reasoning" not in result:
+            result["reasoning"] = "无详细分析"
+
+        # 标准化情绪类型
+        valid_emotions = ["neutral", "complaining", "anxious", "surprised", "disappointed"]
+        if result["emotion"] not in valid_emotions:
+            result["emotion"] = "neutral"
+
+        # 标准化情绪强度
+        valid_intensities = ["none", "low", "medium", "high"]
+        if result["emotion_intensity"] not in valid_intensities:
+            result["emotion_intensity"] = "none"
+
+        # 确保empathy_keywords是列表
+        if not isinstance(result["empathy_keywords"], list):
+            result["empathy_keywords"] = []
+
+        return result

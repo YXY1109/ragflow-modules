@@ -1,10 +1,15 @@
 # ===================
 # 上下文依赖型Query改写器
 # ===================
-from .utils import BaseQueryRewriter, get_completion
+from .utils import BaseQueryRewriter, get_completion, QueryRewriterConfig
+
 
 class ContextDependentQueryRewriter(BaseQueryRewriter):
     """上下文依赖型Query改写器"""
+
+    def __init__(self, model: str = None, config: QueryRewriterConfig = None):
+        self.model = model or (config.model if config else "z-ai/glm-4.5-air:free")
+        self.config = config or QueryRewriterConfig()
 
     def rewrite(self, current_query: str, conversation_history: str = "") -> str:
         """将依赖上下文的查询改写为独立完整的查询"""

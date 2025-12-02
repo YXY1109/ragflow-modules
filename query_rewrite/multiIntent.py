@@ -1,8 +1,10 @@
 # ==========
 # 多意图型Query改写器
 # ==========
-from .utils import BaseQueryRewriter, get_completion
-import json
+from typing import Dict, Any
+
+from .utils import BaseQueryRewriter, get_json_completion, QueryRewriterConfig
+
 
 class MultiIntentQueryRewriter(BaseQueryRewriter):
     """多意图型Query改写器
@@ -19,7 +21,11 @@ class MultiIntentQueryRewriter(BaseQueryRewriter):
     • 效率优化（一次问多个问题）
     """
 
-    def rewrite(self, query: str, context: str = "") -> dict:
+    def __init__(self, model: str = None, config: QueryRewriterConfig = None):
+        self.model = model or (config.model if config else "z-ai/glm-4.5-air:free")
+        self.config = config or QueryRewriterConfig()
+
+    def rewrite(self, query: str, context: str = "") -> Dict[str, Any]:
         """拆分多意图Query为多个独立子Query
 
         拆分策略:
@@ -50,35 +56,93 @@ class MultiIntentQueryRewriter(BaseQueryRewriter):
 - low: 可选问题、额外信息
 
 【输出格式】:
-请返回JSON格式的结果，包含以下字段：
-- intent_count: 意图数量
-- sub_queries: 子查询列表，每个包含query和priority
+请返回严格的JSON格式，包含以下字段：
+- intent_count: 意图数量（整数）
+- sub_queries: 子查询列表，每个对象包含:
+  - query: 拆分后的子查询字符串
+  - priority: 优先级（"high", "medium", "low"）
+  - topic: 主题类别（如"价格", "时间", "交通"等）
 - original_query: 原始查询
-- reasoning: 拆分理由
+- reasoning: 拆分理由和逻辑
+
+【注意事项】:
+1. 如果只有一个意图，intent_count设为1，sub_queries为空数组
+2. 确保每个子查询都是完整的、可独立回答的问题
+3. 优先级标注要合理，核心问题为high
+4. topic字段要简明扼要，反映查询主题
 """
+
         prompt = f"""
 ### 指令 ###
 {instruction}
 
 ### 上下文信息 ###
-{context}
+{context if context else "无特定上下文"}
 
 ### 用户查询 ###
 {query}
 
-### 分析结果（JSON格式）###
+### 分析结果（严格JSON格式）###
 """
-        response = get_completion(prompt, self.model)
 
-        # 解析JSON
+        # 使用新的JSON completion方法
         try:
-            result = json.loads(response)
-            return result
+            result = get_json_completion(
+                prompt,
+                model=self.model,
+                temperature=0.3,  # 使用较低温度确保一致性
+                config=self.config
+            )
+
+            # 确保返回的数据结构正确
+            if "error" in result:
+                # 如果API调用失败，返回默认结果
+                return self._get_default_result(query, "API调用失败")
+
+            # 验证并补全必要字段
+            return self._validate_and_normalize_result(result, query)
+
         except Exception as e:
-            # 如果解析失败，返回原始Query
-            return {
-                "intent_count": 1,
-                "sub_queries": [],
-                "original_query": query,
-                "reasoning": f"解析失败: {str(e)}"
-            }
+            print(f"多意图改写失败: {e}")
+            return self._get_default_result(query, str(e))
+
+    def _get_default_result(self, query: str, error_msg: str) -> Dict[str, Any]:
+        """获取默认结果（处理失败时使用）"""
+        return {
+            "intent_count": 1,
+            "sub_queries": [],
+            "original_query": query,
+            "reasoning": f"解析失败或只有一个意图: {error_msg}"
+        }
+
+    def _validate_and_normalize_result(self, result: Dict[str, Any], original_query: str) -> Dict[str, Any]:
+        """验证并标准化返回结果"""
+        # 确保必要字段存在
+        if "intent_count" not in result:
+            result["intent_count"] = 1
+        if "sub_queries" not in result:
+            result["sub_queries"] = []
+        if "original_query" not in result:
+            result["original_query"] = original_query
+        if "reasoning" not in result:
+            result["reasoning"] = "无详细说明"
+
+        # 标准化子查询格式
+        if result["sub_queries"]:
+            for i, sub_query in enumerate(result["sub_queries"]):
+                if not isinstance(sub_query, dict):
+                    continue
+
+                # 确保必要字段
+                if "query" not in sub_query:
+                    sub_query["query"] = f"子查询 {i + 1}"
+                if "priority" not in sub_query:
+                    sub_query["priority"] = "medium"
+                if "topic" not in sub_query:
+                    sub_query["topic"] = "general"
+
+                # 标准化优先级
+                if sub_query["priority"] not in ["high", "medium", "low"]:
+                    sub_query["priority"] = "medium"
+
+        return result

@@ -1,95 +1,150 @@
 # ========
-# 公共工具函数
+# 公共工具函数 - 基于OpenRouter API
 # ========
 import json
 import re
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-def get_completion(prompt: str, model: str = "qwen-turbo-latest") -> str:
+import httpx
+from openai import OpenAI
+from openai.types.chat import ChatCompletionUserMessageParam
+
+# OpenRouter API配置
+OPENROUTER_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+OPENROUTER_API_KEY = os.getenv("DASHSCOPE_API_KEY")
+DEFAULT_MODEL = "glm-4.6"
+
+# 创建HTTP客户端，增加超时配置
+http_client = httpx.Client(
+    timeout=httpx.Timeout(
+        connect=30.0,  # 连接超时30秒
+        read=120.0,  # 读取超时120秒
+        write=30.0,  # 写入超时30秒
+        pool=30.0  # 连接池超时30秒
+    ),
+    limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+)
+
+# 创建OpenAI客户端
+openai_client = OpenAI(
+    base_url=OPENROUTER_BASE_URL,
+    api_key=OPENROUTER_API_KEY,
+    http_client=http_client
+)
+
+
+class QueryRewriterConfig:
+    """Query改写器配置类"""
+
+    def __init__(
+            self,
+            api_key: Optional[str] = None,
+            base_url: Optional[str] = None,
+            model: str = DEFAULT_MODEL,
+            timeout_connect: float = 30.0,
+            timeout_read: float = 120.0,
+            timeout_write: float = 30.0,
+            timeout_pool: float = 30.0,
+            max_connections: int = 10,
+            max_keepalive_connections: int = 5
+    ):
+        self.api_key = api_key or OPENROUTER_API_KEY
+        self.base_url = base_url or OPENROUTER_BASE_URL
+        self.model = model
+        self.timeout_config = {
+            "connect": timeout_connect,
+            "read": timeout_read,
+            "write": timeout_write,
+            "pool": timeout_pool
+        }
+        self.limits_config = {
+            "max_connections": max_connections,
+            "max_keepalive_connections": max_keepalive_connections
+        }
+
+
+def get_completion(
+        prompt: str,
+        model: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+        config: Optional[QueryRewriterConfig] = None
+) -> str:
     """
-    模拟LLM调用的函数，用于测试和演示
-    实际使用时替换为真实的LLM调用
+    使用OpenRouter API调用LLM
+
+    Args:
+        prompt: 提示词
+        model: 模型名称，如果为None则使用配置中的模型
+        temperature: 温度参数，控制输出的随机性
+        max_tokens: 最大token数
+        config: 配置对象
+
+    Returns:
+        LLM响应文本
     """
-    # 简单的模拟响应逻辑
-    if "多意图" in prompt or "multiple" in prompt.lower() or "价格？开放时间？怎么去？" in prompt:
-        return """{
-            "intent_count": 3,
-            "sub_queries": [
-                {
-                    "query": "迪士尼乐园门票价格是多少？",
-                    "priority": "high",
-                    "topic": "ticket_price"
-                },
-                {
-                    "query": "迪士尼乐园的开放时间是什么时候？",
-                    "priority": "medium",
-                    "topic": "opening_hours"
-                },
-                {
-                    "query": "怎么去迪士尼乐园？",
-                    "priority": "medium",
-                    "topic": "transportation"
-                }
-            ],
-            "reasoning": "用户询问三个独立的问题：价格、时间、交通方式"
-        }"""
-    elif "指代" in prompt or "reference" in prompt.lower() or "它不会要排队2小时吧？" in prompt:
-        if "它" in prompt or "它不会要排队" in prompt:
-            return "创极速光轮过山车项目的实际排队时间是多久？平日和周末分别需要等待多长时间？"
-        elif "都" in prompt:
-            return "疯狂动物城园区和宝藏湾园区的所有游乐项目都有身高限制吗？"
-        else:
-            return "上海迪士尼乐园的加勒比海盗：战争之潮项目适合小朋友吗？"
-    elif "对比" in prompt or "comparison" in prompt.lower() or "哪个更好" in prompt:
-        return "比较上海迪士尼乐园的疯狂动物城园区和宝藏湾园区，哪个更适合带小孩游玩？请从刺激程度、身高限制、互动性和安全性四个方面进行详细对比分析。"
-    elif "上下文" in prompt or "context" in prompt.lower() or "其他适合" in prompt:
-        if "其他设施" in prompt:
-            return "除了警察局互动体验、朱迪警官训练营和尼克狐的冰淇淋店，疯狂动物城园区还有其他游乐设施吗？"
-        else:
-            return "除了疯狂动物城园区和宝藏湾园区，上海迪士尼乐园还有哪些其他适合小孩游玩的园区和项目？"
-    elif "反问" in prompt or "rhetorical" in prompt.lower() or "不会要排队" in prompt or "怎么这么" in prompt:
-        return """{
-            "is_rhetorical": true,
-            "emotion": "anxious",
-            "emotion_intensity": "medium",
-            "rewritten_query": "创极速光轮过山车的实际排队时间是多久？平日和周末分别需要等待多长时间？",
-            "original_query": "它不会要排队2小时吧？",
-            "empathy_keywords": ["理解您对排队时间的担心", "让我为您查询实际情况"],
-            "reasoning": "用户使用反问句式表达对长时间排队的担心"
-        }"""
-    elif "RAG系统的Query类型识别器" in prompt:
-        # 为Query类型识别器提供更智能的响应
-        if "排队" in prompt and "吧" in prompt:
-            return """{
-                "query_type": ["rhetorical", "reference"],
-                "confidence": 0.85,
-                "detected_keywords": ["它", "不会...吧"],
-                "reasoning": "用户使用反问句式询问排队时间，同时包含指代词'它'"
-            }"""
-        elif "其他适合" in prompt and "哪个更好" in prompt:
-            return """{
-                "query_type": ["context_dependent", "comparison"],
-                "confidence": 0.9,
-                "detected_keywords": ["其他", "哪个更好"],
-                "reasoning": "用户询问其他适合的园区并进行对比，需要上下文信息"
-            }"""
-        elif "价格？开放时间？怎么去？" in prompt:
-            return """{
-                "query_type": ["multi_intent"],
-                "confidence": 0.95,
-                "detected_keywords": ["？", "？", "？"],
-                "reasoning": "用户连续询问三个独立的问题，属于多意图查询"
-            }"""
-        else:
-            return """{
-                "query_type": [],
-                "confidence": 0.3,
-                "detected_keywords": [],
-                "reasoning": "普通查询，无需特殊改写"
-            }"""
-    else:
-        # 默认返回原query
-        return "这是一个普通的查询"
+    if config is None:
+        config = QueryRewriterConfig()
+
+    # 使用类型化的消息参数
+    messages: list[ChatCompletionUserMessageParam] = [
+        {
+            "role": "user",
+            "content": prompt
+        }
+    ]
+
+    try:
+        completion = openai_client.chat.completions.create(
+            model=model or config.model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+
+        result = completion.choices[0].message.content
+        return result if result else ""
+
+    except Exception as e:
+        print(f"OpenRouter API调用失败: {e}")
+        return ""
+
+
+def get_json_completion(
+        prompt: str,
+        model: Optional[str] = None,
+        temperature: float = 0.3,  # JSON任务使用较低温度
+        max_tokens: Optional[int] = None,
+        config: Optional[QueryRewriterConfig] = None
+) -> Dict[str, Any]:
+    """
+    使用OpenRouter API获取JSON格式的响应
+
+    Args:
+        prompt: 提示词
+        model: 模型名称
+        temperature: 温度参数
+        max_tokens: 最大token数
+        config: 配置对象
+
+    Returns:
+        解析后的JSON对象
+    """
+    # 在提示词中明确要求JSON输出
+    json_prompt = f"""{prompt}
+
+请直接返回JSON格式的响应，不要包含任何其他文本或说明。"""
+
+    response = get_completion(json_prompt, model, temperature, max_tokens, config)
+    cleaned_response = preprocess_json_response(response)
+
+    try:
+        return json.loads(cleaned_response)
+    except json.JSONDecodeError as e:
+        print(f"JSON解析失败: {e}")
+        print(f"原始响应: {response}")
+        return {"error": "JSON解析失败", "raw_response": response}
+
 
 def preprocess_json_response(response: str) -> str:
     """
@@ -100,6 +155,7 @@ def preprocess_json_response(response: str) -> str:
     if json_match:
         return json_match.group(0)
     return response
+
 
 class BaseQueryRewriter:
     """Query改写器基类"""

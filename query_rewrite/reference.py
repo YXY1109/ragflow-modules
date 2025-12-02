@@ -1,7 +1,8 @@
 # ===========
 # 模糊指代型Query改写器
 # ============
-from .utils import BaseQueryRewriter, get_completion
+from .utils import BaseQueryRewriter, get_completion, QueryRewriterConfig
+
 
 class ReferenceQueryRewriter(BaseQueryRewriter):
     """模糊指代型Query改写器
@@ -16,6 +17,10 @@ class ReferenceQueryRewriter(BaseQueryRewriter):
     2. 指代对象定位（需要理解上下文）
     3. 多义性消解（可能有多个候选对象）
     """
+
+    def __init__(self, model: str = None, config: QueryRewriterConfig = None):
+        self.model = model or (config.model if config else "z-ai/glm-4.5-air:free")
+        self.config = config or QueryRewriterConfig()
 
     def rewrite(self, current_query: str, conversation_history: str = "") -> str:
         """消除模糊指代，生成明确的Query
