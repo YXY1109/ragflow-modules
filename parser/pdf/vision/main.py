@@ -1,4 +1,4 @@
-
+from parser.pdf.vision.vision_parser import VisionParser
 
 
 def demo_file():
