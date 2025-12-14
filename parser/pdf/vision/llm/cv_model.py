@@ -5,10 +5,10 @@ from io import BytesIO
 from urllib.parse import urljoin
 
 from openai import OpenAI, AsyncOpenAI
-from rag.prompts.generator import vision_llm_describe_prompt
 
 from nlp import is_english
 from parser.pdf.vision.llm.token_utils import total_token_count_from_response
+from prompts.generator import vision_llm_describe_prompt
 
 
 class Base(ABC):
