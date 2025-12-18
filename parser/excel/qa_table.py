@@ -34,6 +34,7 @@ def random_choices(items, k=1):
 
 class ExcelParser:
     """基础Excel解析器类"""
+
     def __init__(self):
         self.is_english = False
 
